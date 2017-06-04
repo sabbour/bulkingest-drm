@@ -6,10 +6,8 @@ using System.Threading.Tasks;
 
 namespace bulkingestdrm.dto
 {
-    public class MonitorIngestRequest
+    public class CleanupManifestRequest
     {
-        public string AssetId { get; set; }
         public string IngestManifestId { get; set; }
-        public bool IsProtected { get; set; }
     }
 }

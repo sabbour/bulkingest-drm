@@ -94,7 +94,7 @@ namespace bulkingestdrm.functions
 
             // Pass the Asset ID and IngestManifest ID to the queue, to trigger the logic app
             log.Info($"Added Asset ID {asset.Id} and IngestManifest ID {ingestManifest.Id} to queue to trigger the Logic App.");
-            monitorIngestMessage = new MonitorIngestRequest { AssetId = asset.Id, IngestManifestId = ingestManifest.Id };
+            monitorIngestMessage = new MonitorIngestRequest { AssetId = asset.Id, IngestManifestId = ingestManifest.Id, IsProtected = ciRequest.IsProtected };
 
             log.Info("Returning response.");
             return req.CreateResponse(HttpStatusCode.Created, ciResponse);

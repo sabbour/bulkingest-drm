@@ -10,6 +10,7 @@ namespace bulkingestdrm.dto
     {
         public string AlternateId { get; set; }
         public string AssetName { get; set; }
+        public bool IsProtected { get; set; }
         public List<string> AssetFiles { get; set; }
     }
 }

@@ -126,6 +126,7 @@ namespace bulkingestdrm.functions.webhooks
                 AlternateId = asset.AlternateId,
                 CENCKeyId = CENCKey.Id,
                 CBCKeyId = "",
+                IsProtected = true,
                 SmoothStreamingUri = GetStreamingUri(asset, ""),
                 HLSUri = GetStreamingUri(asset, "(format=m3u8-aapl)"),
                 MpegDashUri = GetStreamingUri(asset, "(format=mpd-time-csf)")
