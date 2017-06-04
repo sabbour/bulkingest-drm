@@ -45,12 +45,15 @@ namespace bulkingestdrm.functions.webhooks
 
             var ingestManifest = _context.IngestManifests.Where(m => m.Id == mbimRequest.IngestManifestId).FirstOrDefault();
             if (ingestManifest == null)
-                return req.CreateResponse(HttpStatusCode.NotFound, $"IngestManifest {mbimRequest.IngestManifestId} doesn't exist.");
+                return req.CreateResponse(HttpStatusCode.NotFound, new
+                {
+                    error = $"IngestManifest {mbimRequest.IngestManifestId} doesn't exist."
+                });
 
             if (ingestManifest.Statistics.PendingFilesCount == 0)
             {
                 // Clean-up, delete manifest blob
-                await ingestManifest.DeleteAsync();
+                //await ingestManifest.DeleteAsync(); // will not delete now, since the workflow should take care of this
                 return req.CreateResponse(HttpStatusCode.OK, new
                 {
                     finished = true
@@ -58,7 +61,7 @@ namespace bulkingestdrm.functions.webhooks
             }
             else
             {
-                return req.CreateResponse(HttpStatusCode.OK, new
+                return req.CreateResponse(HttpStatusCode.Accepted, new
                 {
                     finished = false
                 });

@@ -43,7 +43,7 @@ namespace bulkingestdrm.functions.webhooks
         private static MediaServicesCredentials _cachedCredentials = null;
 
         [FunctionName("CreateProtectedStreamingLocatorWebhook")]
-        public static async Task<object> Run([HttpTrigger(WebHookType = "genericJson")]HttpRequestMessage req, TraceWriter log)
+        public static async Task<object> Run([HttpTrigger("post", WebHookType = "genericJson")]HttpRequestMessage req, TraceWriter log)
         {
             // Create and cache the Media Services credentials in a static class variable
             _cachedCredentials = new MediaServicesCredentials(_mediaServicesAccountName, _mediaServicesAccountKey);

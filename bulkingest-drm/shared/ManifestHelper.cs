@@ -32,7 +32,7 @@ namespace bulkingestdrm.shared
             }
         }
 
-        public static ManifestGenerated LoadAndUpdateManifestTemplate(IAsset asset)
+        public static ManifestGenerated LoadAndUpdateManifestTemplate(IAsset asset, string manifestPath)
         {
             var mp4AssetFiles = asset.AssetFiles.ToList().Where(f => f.Name.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase)).ToArray();
             var m4aAssetFiles = asset.AssetFiles.ToList().Where(f => f.Name.EndsWith(".m4a", StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -41,7 +41,7 @@ namespace bulkingestdrm.shared
             if (mp4AssetFiles.Count() != 0 || m4aAssetFiles.Count() != 0)
             {
                 // Prepare the manifest
-                XDocument doc = XDocument.Load(@"shared\Manifest.ism");
+                XDocument doc = XDocument.Load(manifestPath);
                
                 XNamespace ns = "http://www.w3.org/2001/SMIL20/Language";
 

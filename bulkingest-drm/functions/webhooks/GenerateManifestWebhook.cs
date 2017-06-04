@@ -1,17 +1,16 @@
+using bulkingestdrm.dto;
+using bulkingestdrm.shared;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Host;
+using Microsoft.WindowsAzure.MediaServices.Client;
+using System;
+using System.Configuration;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.Azure.WebJobs.Host;
-using bulkingestdrm.shared;
-using System.Xml.Linq;
-using System.IO;
-using System.Configuration;
-using Microsoft.WindowsAzure.MediaServices.Client;
-using System;
 using System.Threading.Tasks;
-using bulkingestdrm.dto;
+using System.Xml.Linq;
 
 namespace bulkingestdrm.functions.webhooks
 {
@@ -26,7 +25,7 @@ namespace bulkingestdrm.functions.webhooks
         private static MediaServicesCredentials _cachedCredentials = null;
 
         [FunctionName("GenerateManifestWebhook")]
-        public static async Task<object> Run([HttpTrigger(WebHookType = "genericJson")]HttpRequestMessage req, TraceWriter log)
+        public static async Task<object> Run([HttpTrigger("post", WebHookType = "genericJson")]HttpRequestMessage req, TraceWriter log, ExecutionContext executionContext)
         {
             log.Info("GenerateManifest requested.");
 
@@ -59,8 +58,21 @@ namespace bulkingestdrm.functions.webhooks
             log.Info("Found the asset. Generating manifest.ism");
             try
             {
-                var smildata = ManifestHelper.LoadAndUpdateManifestTemplate(asset);
+                var manifestFilePath = executionContext.FunctionDirectory + @"\..\bin\shared\Manifest.ism";
+                var smildata = ManifestHelper.LoadAndUpdateManifestTemplate(asset,manifestFilePath);
                 var smilXMLDocument = XDocument.Parse(smildata.Content);
+                
+                // Check if the manifest file exists
+                if(asset.AssetFiles.Where(af=>af.Name == smildata.FileName).FirstOrDefault()!=null)
+                {
+                    // Do nothing
+                    log.Info("Manifest already exists.");
+                    return req.CreateResponse(HttpStatusCode.OK, new
+                    {
+                        message = "Manifest already exists"
+                    });
+                }
+
                 var smildataAssetFile = asset.AssetFiles.Create(smildata.FileName);
 
                 var stream = new MemoryStream();  // Create a stream
@@ -75,9 +87,10 @@ namespace bulkingestdrm.functions.webhooks
             {
                 log.Error("Could not generate the manifest.");
                 log.Error(ex.ToString());
+
                 return req.CreateResponse(HttpStatusCode.InternalServerError, new
                 {
-                    error = "Could not generate the manifest. Are you sure the asset contains media files (mp4, m4a)?"
+                    error = $"Could not generate the manifest. Are you sure the asset contains media files (mp4, m4a)?."
                 });
             }
 

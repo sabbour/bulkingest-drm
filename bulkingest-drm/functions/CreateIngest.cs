@@ -53,31 +53,34 @@ namespace bulkingestdrm.functions
                 }
             }
             #endregion
+            
 
             // Create and cache the Media Services credentials in a static class variable
             _cachedCredentials = new MediaServicesCredentials(_mediaServicesAccountName, _mediaServicesAccountKey);
 
             // Used the cached credentials to create CloudMediaContext
             _context = new CloudMediaContext(_cachedCredentials);
-
+            
             // 1. Create Asset
             #region 1. Create Asset
-            log.Info("Creating Asset.");
-            var asset = _context.Assets.CreateAsync(ciRequest.AssetName, AssetCreationOptions.None, CancellationToken.None).Result; // Create asset
+            log.Info($"Creating Asset with Asset Name {ciRequest.AssetName}");
+            var asset = _context.Assets.Create(ciRequest.AssetName, AssetCreationOptions.None); // Create asset
             asset.AlternateId = ciRequest.AlternateId;
+
+            log.Info($"Updating Asset with AlternateId {ciRequest.AlternateId}");
             asset.Update();
             #endregion
             
             // 2. Create IngestManifest
             #region 2. Create IngestManifest
             log.Info("Creating IngestManifest.");
-            var ingestManifest = _context.IngestManifests.CreateAsync($"ingestmanifest-{_randomId}").Result;
+            var ingestManifest = _context.IngestManifests.Create($"ingestmanifest-{_randomId}");
             #endregion
 
             // 3. Add the file names to the IngestManifest as assets
             #region 3. Add the file names to the IngestManifest as assets
             log.Info("Adding file names to IngestManifest.");
-            var ingestManifestAsset = ingestManifest.IngestManifestAssets.CreateAsync(asset, ciRequest.AssetFiles.ToArray<string>(), CancellationToken.None).Result;
+            var ingestManifestAsset = ingestManifest.IngestManifestAssets.Create(asset, ciRequest.AssetFiles.ToArray<string>());
             #endregion
 
             var ciResponse = new CreateIngestResponse
