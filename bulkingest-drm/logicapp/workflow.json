@@ -1,0 +1,348 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "office365_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "office365-3"
+    },
+    "office365_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "asabbour@microsoft.com"
+    },
+    "azurequeues_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "azurequeues"
+    },
+    "azurequeues_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "MonitorIngestQueue"
+    },
+    "azurequeues_1_storageaccount": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of your storage account"
+      },
+      "defaultValue": "sabbourmediane"
+    },
+    "azurequeues_1_sharedkey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "The shared storage key of your storage account"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "actions": {
+            "Check_if_DRM_is_required_then_create_streaming_locators": {
+              "type": "If",
+              "expression": "@equals(json(triggerBody()?['MessageText'])['IsProtected'], true)",
+              "actions": {
+                "CreateProtectedStreamingLocatorWebhook": {
+                  "type": "Function",
+                  "inputs": {
+                    "body": {
+                      "AssetId": "@{json(triggerBody()?['MessageText']).AssetId}",
+                      "Overwrite": true
+                    },
+                    "function": {
+                      "id": "/subscriptions/90ab3701-83f0-4ba1-a90a-f2e68683adab/resourceGroups/AzureFunctions-WestEurope/providers/Microsoft.Web/sites/bulkingest-drm/functions/CreateProtectedStreamingLocatorWebhook"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "GetTokenWebhook": {
+                  "type": "Function",
+                  "inputs": {
+                    "body": {
+                      "AssetId": "@{json(triggerBody()?['MessageText']).AssetId}",
+                      "KeyId": "@body('CreateProtectedStreamingLocatorWebhook').CENCKeyId"
+                    },
+                    "function": {
+                      "id": "/subscriptions/90ab3701-83f0-4ba1-a90a-f2e68683adab/resourceGroups/AzureFunctions-WestEurope/providers/Microsoft.Web/sites/bulkingest-drm/functions/GetTokenWebhook"
+                    }
+                  },
+                  "runAfter": {
+                    "CreateProtectedStreamingLocatorWebhook": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "POST_protected_streaming_locators_to_third_party_service": {
+                  "type": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "http://mockbin.org/bin/15c573e2-43d7-4ca0-a565-d2b49f56af10",
+                    "body": "@body('CreateProtectedStreamingLocatorWebhook')"
+                  },
+                  "runAfter": {
+                    "CreateProtectedStreamingLocatorWebhook": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Send_an_email_with_protected_streaming_locators": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "api": {
+                        "runtimeUrl": "https://logic-apis-westeurope.azure-apim.net/apim/office365"
+                      },
+                      "connection": {
+                        "name": "@parameters('$connections')['office365']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "path": "/Mail",
+                    "body": {
+                      "To": "asabbour@microsoft.com",
+                      "Subject": "Protected asset ready for streaming",
+                      "Body": "<h1>Asset details:</h1>\n<b>Asset Id:</b> @{body('CreateProtectedStreamingLocatorWebhook')['AssetId']}\n<b>Alternate Id:</b> @{body('CreateProtectedStreamingLocatorWebhook')['AlternateId']}\n<b>Smooth Streaming:</b> <a href=\"@{body('CreateProtectedStreamingLocatorWebhook')['SmoothStreamingUri']}\"></a>\n<b>MPEG-DASH:</b> <a href=\"@{body('CreateProtectedStreamingLocatorWebhook')['MpegDashUri']}\"></a>\n<b>HLS:</b> <a href=\"@{body('CreateProtectedStreamingLocatorWebhook')['HLSUri']}\"></a>\n<b>CENC Token:</b> @{body('GetTokenWebhook').Token}\n<b>CENC Token Base64:</b> @{body('GetTokenWebhook').TokenBase64}"
+                    }
+                  },
+                  "runAfter": {
+                    "GetTokenWebhook": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runAfter": {
+                "Generate_Manifest": [
+                  "Succeeded"
+                ]
+              },
+              "else": {
+                "actions": {
+                  "CreateStreamingLocatorWebhook": {
+                    "type": "Function",
+                    "inputs": {
+                      "body": {
+                        "AssetId": "@{json(triggerBody()?['MessageText']).AssetId}",
+                        "Overwrite": true
+                      },
+                      "function": {
+                        "id": "/subscriptions/90ab3701-83f0-4ba1-a90a-f2e68683adab/resourceGroups/AzureFunctions-WestEurope/providers/Microsoft.Web/sites/bulkingest-drm/functions/CreateStreamingLocatorWebhook"
+                      }
+                    },
+                    "runAfter": {}
+                  },
+                  "POST_unprotected_streaming_locators_to_3rd_party_service": {
+                    "type": "Http",
+                    "inputs": {
+                      "method": "POST",
+                      "uri": "http://mockbin.org/bin/15c573e2-43d7-4ca0-a565-d2b49f56af10",
+                      "body": "@body('CreateStreamingLocatorWebhook')"
+                    },
+                    "runAfter": {
+                      "CreateStreamingLocatorWebhook": [
+                        "Succeeded"
+                      ]
+                    }
+                  },
+                  "Send_an_email_with_unprotected_streaming_locators": {
+                    "type": "ApiConnection",
+                    "inputs": {
+                      "host": {
+                        "api": {
+                          "runtimeUrl": "https://logic-apis-westeurope.azure-apim.net/apim/office365"
+                        },
+                        "connection": {
+                          "name": "@parameters('$connections')['office365']['connectionId']"
+                        }
+                      },
+                      "method": "post",
+                      "path": "/Mail",
+                      "body": {
+                        "To": "asabbour@microsoft.com",
+                        "Subject": "Unprotected asset ready for streaming",
+                        "Body": "<h1>Asset details:</h1>\n<b>Asset Id:</b> @{body('CreateStreamingLocatorWebhook')['AssetId']}\n<b>Alternate Id:</b> @{body('CreateStreamingLocatorWebhook')['AlternateId']}\n<b>Smooth Streaming:</b> <a href=\"@{body('CreateStreamingLocatorWebhook')['SmoothStreamingUri']}\"></a>\n<b>MPEG-DASH:</b> <a href=\"@{body('CreateStreamingLocatorWebhook')['MpegDashUri']}\"></a>\n<b>HLS:</b> <a href=\"@{body('CreateStreamingLocatorWebhook')['HLSUri']}\"></a>"
+                      }
+                    },
+                    "runAfter": {
+                      "CreateStreamingLocatorWebhook": [
+                        "Succeeded"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "Cleanup_Ingest_Manifest": {
+              "type": "Function",
+              "inputs": {
+                "body": {
+                  "IngestManifestId": "@json(triggerBody()?['MessageText']).IngestManifestId"
+                },
+                "function": {
+                  "id": "/subscriptions/90ab3701-83f0-4ba1-a90a-f2e68683adab/resourceGroups/AzureFunctions-WestEurope/providers/Microsoft.Web/sites/bulkingest-drm/functions/CleanupBulkIngestManifestWebhook"
+                }
+              },
+              "runAfter": {
+                "Check_if_DRM_is_required_then_create_streaming_locators": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Delete_message": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "api": {
+                    "runtimeUrl": "https://logic-apis-westeurope.azure-apim.net/apim/azurequeues"
+                  },
+                  "connection": {
+                    "name": "@parameters('$connections')['azurequeues']['connectionId']"
+                  }
+                },
+                "method": "delete",
+                "path": "/@{encodeURIComponent('monitoringestqueue')}/messages/@{encodeURIComponent(triggerBody()?['MessageId'])}",
+                "queries": {
+                  "popreceipt": "@{triggerBody()?['PopReceipt']}"
+                }
+              },
+              "runAfter": {
+                "Cleanup_Ingest_Manifest": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Generate_Manifest": {
+              "type": "Function",
+              "inputs": {
+                "body": {
+                  "AssetId": "@{json(triggerBody()?['MessageText']).AssetId}"
+                },
+                "function": {
+                  "id": "/subscriptions/90ab3701-83f0-4ba1-a90a-f2e68683adab/resourceGroups/AzureFunctions-WestEurope/providers/Microsoft.Web/sites/bulkingest-drm/functions/GenerateManifestWebhook"
+                }
+              },
+              "runAfter": {
+                "Wait_until_the_files_are_uploaded": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Wait_until_the_files_are_uploaded": {
+              "type": "Until",
+              "expression": "@equals(outputs('MonitorBulkIngestManifestWebhook')['statusCode'], 200)",
+              "limit": {
+                "count": 60,
+                "timeout": "PT1H"
+              },
+              "actions": {
+                "MonitorBulkIngestManifestWebhook": {
+                  "type": "Function",
+                  "inputs": {
+                    "body": {
+                      "AssetId": "@json(triggerBody()?['MessageText']).AssetId",
+                      "IngestManifestId": "@json(triggerBody()?['MessageText']).IngestManifestId"
+                    },
+                    "function": {
+                      "id": "/subscriptions/90ab3701-83f0-4ba1-a90a-f2e68683adab/resourceGroups/AzureFunctions-WestEurope/providers/Microsoft.Web/sites/bulkingest-drm/functions/MonitorBulkIngestManifestWebhook"
+                    }
+                  },
+                  "runAfter": {}
+                }
+              },
+              "runAfter": {}
+            }
+          },
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            }
+          },
+          "triggers": {
+            "When_there_are_messages_in_a_queue": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "api": {
+                    "runtimeUrl": "https://logic-apis-westeurope.azure-apim.net/apim/azurequeues"
+                  },
+                  "connection": {
+                    "name": "@parameters('$connections')['azurequeues']['connectionId']"
+                  }
+                },
+                "method": "get",
+                "path": "/@{encodeURIComponent('monitoringestqueue')}/message_trigger",
+                "queries": {
+                  "visibilitytimeout": "3600"
+                }
+              },
+              "recurrence": {
+                "frequency": "Minute",
+                "interval": 1
+              },
+              "splitOn": "@triggerBody()?.QueueMessagesList.QueueMessage"
+            }
+          },
+          "contentVersion": "1.0.0.0",
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "office365": {
+                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', 'westeurope', '/managedApis/', 'office365')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('office365_1_Connection_Name'))]",
+                "connectionName": "[parameters('office365_1_Connection_Name')]"
+              },
+              "azurequeues": {
+                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', 'westeurope', '/managedApis/', 'azurequeues')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('azurequeues_1_Connection_Name'))]",
+                "connectionName": "[parameters('azurequeues_1_Connection_Name')]"
+              }
+            }
+          }
+        },
+        "integrationAccount": null
+      },
+      "name": "bulkingest-workflow",
+      "type": "Microsoft.Logic/workflows",
+      "location": "westeurope",
+      "apiVersion": "2016-06-01",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/connections', parameters('office365_1_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('azurequeues_1_Connection_Name'))]"
+      ]
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('office365_1_Connection_Name')]",
+      "location": "westeurope",
+      "properties": {
+        "api": {
+          "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', 'westeurope', '/managedApis/', 'office365')]"
+        },
+        "displayName": "[parameters('office365_1_Connection_DisplayName')]"
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('azurequeues_1_Connection_Name')]",
+      "location": "westeurope",
+      "properties": {
+        "api": {
+          "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', 'westeurope', '/managedApis/', 'azurequeues')]"
+        },
+        "displayName": "[parameters('azurequeues_1_Connection_DisplayName')]",
+        "parameterValues": {
+          "storageaccount": "[parameters('azurequeues_1_storageaccount')]",
+          "sharedkey": "[parameters('azurequeues_1_sharedkey')]"
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}
